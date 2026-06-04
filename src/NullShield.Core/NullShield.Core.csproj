@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Multi-target: netstandard2.0 satisfies the generator host constraint;
+         net8.0/net9.0 give modern consumers access to the latest runtime features. -->
+    <TargetFrameworks>netstandard2.0;net8.0;net9.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+
+    <!-- Deterministic builds for reproducible NuGet packages -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- NuGet package metadata -->
+    <PackageId>NullShield.Core</PackageId>
+    <Version>1.0.0-alpha.1</Version>
+    <Authors>NullShield Contributors</Authors>
+    <Description>
+      Core abstractions for NullShield — a compile-time NullReferenceException mitigation
+      library powered by Roslyn Source Generators. Zero dependencies. Zero runtime overhead.
+    </Description>
+    <PackageTags>roslyn;analyzer;source-generator;null-safety;nullguard;nullshield</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Zero external runtime dependencies -->
+
+</Project>
