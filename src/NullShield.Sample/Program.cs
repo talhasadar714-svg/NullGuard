@@ -1,83 +1,46 @@
-// ============================================================================
-// NullShield Sample — Demonstrates the generator in action
-// ============================================================================
-
+using System;
 using NullShield.Core.Attributes;
 using NullShield.Core.Enums;
 
-// -------------------------------------------------------
-// 1) Class-level attribute on a partial class
-//    The generator should produce a .g.cs placeholder for this target.
-// -------------------------------------------------------
-[NullShield(MitigationStrategy.DefaultInstance | MitigationStrategy.TraceAndSkip)]
-public partial class OrderService
+namespace NullShield.Sample
 {
-    public void Submit(string? orderId, int quantity)
+    internal class Program
     {
-        Console.WriteLine($"Submitting order {orderId} × {quantity}");
-    }
+        static void Main(string[] args)
+        {
+            Console.WriteLine("=== NullShield Güvenlik Duvarı Testi ===");
 
-    public void Cancel(string? orderId)
-    {
-        Console.WriteLine($"Cancelling order {orderId}");
-    }
-}
+            try
+            {
+                // 1. Test: Geçerli veri gönderiyoruz (Hata vermemeli)
+                YullaniciKaydet("Talha Şadar", "talha@example.com");
+                Console.WriteLine("1. Test Başarılı: Geçerli kullanıcı kaydedildi.\n");
 
-// -------------------------------------------------------
-// 2) Method-level attribute
-// -------------------------------------------------------
-public partial class PaymentProcessor
-{
-    [NullShield(MitigationStrategy.ShortCircuit)]
-    public void Charge(string? cardToken, decimal amount)
-    {
-        Console.WriteLine($"Charging {amount:C} to {cardToken}");
-    }
-}
+                // 2. Test: Null veri gönderiyoruz (Source Generator yakalamalı!)
+                Console.WriteLine("2. Test Başlatılıyor: Null isim gönderiliyor...");
+                YullaniciKaydet(null!, "test@example.com");
+            }
+            catch (ArgumentNullException ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"\n[KORUMA TETİKLENDİ] Yakalanan Hata: {ex.Message}");
+                Console.ResetColor();
+            }
 
-// -------------------------------------------------------
-// 3) Diagnostic test: non-partial class → expect NS0003 error
-//    Uncomment the lines below to see the compiler error.
-// -------------------------------------------------------
-// [NullShield(MitigationStrategy.DefaultInstance)]
-// public class NotPartialService
-// {
-//     public void Run() { }
-// }
+            Console.ReadLine();
+        }
 
-// -------------------------------------------------------
-// 4) Diagnostic test: MitigationStrategy.None → expect NS0001 warning
-//    Uncomment the lines below to see the compiler warning.
-// -------------------------------------------------------
-// [NullShield((MitigationStrategy)0)]
-// public partial class NoOpService
-// {
-//     public void Run() { }
-// }
+        // Metodun tepesine imzamızı atıyoruz
+        [NullShield(MitigationStrategy.ThrowException)]
+        public static void YullaniciKaydet(string username, string email)
+        {
+            // Biz buraya manuel olarak "if(username == null)" yazmadık!
+            // Bizim jeneratör derleme anında otomatik enjekte edecek.
+            
+            // Arka planda üretilen guard metodunu çağırıyoruz:
+            NullShield_Guard_Program_YullaniciKaydet.ValidateParameters(username, email);
 
-// -------------------------------------------------------
-// Main — run the sample
-// -------------------------------------------------------
-public class Program
-{
-    public static void Main()
-    {
-        Console.WriteLine("=== NullShield Sample ===");
-        Console.WriteLine();
-
-        var orders = new OrderService();
-        orders.Submit("ORD-001", 3);
-        orders.Submit(null, 1);     // Would be guarded in Phase 3
-        orders.Cancel("ORD-002");
-
-        Console.WriteLine();
-
-        var payments = new PaymentProcessor();
-        payments.Charge("tok_visa_4242", 99.95m);
-        payments.Charge(null, 50.00m); // Would be short-circuited in Phase 3
-
-        Console.WriteLine();
-        Console.WriteLine("Build succeeded — generator is active!");
-        Console.WriteLine("Check obj/Generated/ for emitted .g.cs placeholder files.");
+            Console.WriteLine($"[Metod İçi] Veritabanı işlemi yapılıyor: {username} ({email})");
+        }
     }
 }
