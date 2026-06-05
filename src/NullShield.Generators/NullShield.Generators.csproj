@@ -1,31 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Roslyn analyzer/generator hosts require netstandard2.0.
-         This is a hard constraint enforced by the SDK tooling. -->
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
 
-    <!-- Marks this project as a Roslyn analyzer/generator component.
-         The SDK uses this flag to enforce ExtendedAnalyzerRules and to
-         correctly package the assembly under 'analyzers/dotnet/cs/' in the NuGet layout. -->
     <IsRoslynComponent>true</IsRoslynComponent>
-
-    <!-- Strict Roslyn component validation: prevents use of APIs that are
-         unsafe inside analyzer/generator host processes (e.g., Console, Thread). -->
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-
-    <!-- Suppress the default implicit framework reference; analyzers must not
-         depend on any runtime framework beyond netstandard2.0. -->
     <IncludeExplicitFrameworkReference>false</IncludeExplicitFrameworkReference>
 
-    <!-- Deterministic builds -->
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
 
-    <!-- NuGet package metadata -->
     <PackageId>NullShield.Generators</PackageId>
     <Version>0.0.1</Version>
     <AssemblyVersion>0.0.1.0</AssemblyVersion>
@@ -41,24 +28,14 @@
     <RepositoryUrl>https://github.com/talhasadar714-svg/NullGuard</RepositoryUrl>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <!-- Prevent the generator assembly from being referenced as a regular dependency -->
     <DevelopmentDependency>true</DevelopmentDependency>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Microsoft.CodeAnalysis.CSharp ≥ 4.8.0 is required for:
-         - IIncrementalGenerator
-         - ForAttributeWithMetadataName (fast, cache-friendly attribute lookup)
-         - IncrementalValuesProvider / IncrementalValueProvider caching APIs
-         PrivateAssets="all" keeps this off the consumer's compile-time dependency graph. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
-  </PropertyGroup>
+  </ItemGroup>
 
   <ItemGroup>
-    <!-- Include NullShield.Core inside the analyzer payload.
-         OutputItemType="Analyzer" places the DLL under analyzers/dotnet/cs/ in the NuGet package.
-         ReferenceOutputAssembly="false" ensures the Core DLL does NOT appear in the
-         consumer project's compile references — it is only visible to the generator. -->
     <ProjectReference
       Include="..\NullShield.Core\NullShield.Core.csproj"
       OutputItemType="Analyzer"
