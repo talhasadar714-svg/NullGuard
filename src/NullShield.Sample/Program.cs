@@ -8,39 +8,36 @@ namespace NullShield.Sample
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("=== NullShield Güvenlik Duvarı Testi ===");
+            Console.WriteLine("=== NullShield Security Shield Test ===");
 
             try
             {
-                // 1. Test: Geçerli veri gönderiyoruz (Hata vermemeli)
-                YullaniciKaydet("Talha Şadar", "talha@example.com");
-                Console.WriteLine("1. Test Başarılı: Geçerli kullanıcı kaydedildi.\n");
+                // Test 1: Sending valid data
+                SaveUser("Talha Sadar", "talha@example.com");
+                Console.WriteLine("Test 1 Passed: Valid user processed successfully.\n");
 
-                // 2. Test: Null veri gönderiyoruz (Source Generator yakalamalı!)
-                Console.WriteLine("2. Test Başlatılıyor: Null isim gönderiliyor...");
-                YullaniciKaydet(null!, "test@example.com");
+                // Test 2: Sending null data (Source Generator must intercept!)
+                Console.WriteLine("Test 2 Triggered: Sending null username...");
+                SaveUser(null!, "test@example.com");
             }
             catch (ArgumentNullException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\n[KORUMA TETİKLENDİ] Yakalanan Hata: {ex.Message}");
+                Console.WriteLine($"\n[SHIELD INTERCEPTED] Caught Expected Exception:");
+                Console.WriteLine(ex.Message);
                 Console.ResetColor();
             }
 
             Console.ReadLine();
         }
 
-        // Metodun tepesine imzamızı atıyoruz
         [NullShield(MitigationStrategy.ThrowException)]
-        public static void YullaniciKaydet(string username, string email)
+        public static void SaveUser(string username, string email)
         {
-            // Biz buraya manuel olarak "if(username == null)" yazmadık!
-            // Bizim jeneratör derleme anında otomatik enjekte edecek.
-            
-            // Arka planda üretilen guard metodunu çağırıyoruz:
-            NullShield_Guard_Program_YullaniciKaydet.ValidateParameters(username, email);
+            // Metot adi SaveUser oldugu icin jenerator otomatik olarak bu sinifi uretti:
+            NullShield_Guard_Program_SaveUser.ValidateParameters(username, email);
 
-            Console.WriteLine($"[Metod İçi] Veritabanı işlemi yapılıyor: {username} ({email})");
+            Console.WriteLine($"[Method Body] Processing database action for: {username} ({email})");
         }
     }
 }

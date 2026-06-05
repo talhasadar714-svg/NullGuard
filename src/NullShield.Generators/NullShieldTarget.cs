@@ -56,7 +56,9 @@ internal sealed record NullShieldTarget(
     string SymbolName,
     string FullyQualifiedName,
     string ContainingNamespace,
+    string ContainingTypeName,
     bool IsClass,
     int MitigationStrategyValue,
     string? LoggerTypeFullName,
-    bool ForceGuard);
+    bool ForceGuard,
+    System.Collections.Immutable.ImmutableArray<(string Name, string Type)> Parameters);

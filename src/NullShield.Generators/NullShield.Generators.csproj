@@ -11,7 +11,7 @@
     <Deterministic>true</Deterministic>
 
     <PackageId>NullShield.Generators</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Authors>Talha Şadar</Authors>
     <Description>Roslyn Incremental Source Generator for NullShield.</Description>
     <DevelopmentDependency>true</DevelopmentDependency>
