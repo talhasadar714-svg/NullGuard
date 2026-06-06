@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IncludeExplicitFrameworkReference>false</IncludeExplicitFrameworkReference>
+    <Deterministic>true</Deterministic>
+
+    <PackageId>NullShield.Generators</PackageId>
+    <Version>0.0.2</Version>
+    <Authors>Talha Şadar</Authors>
+    <Description>Roslyn Incremental Source Generator for NullShield.</Description>
+    <DevelopmentDependency>true</DevelopmentDependency>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\\NullShield.Core\\NullShield.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
