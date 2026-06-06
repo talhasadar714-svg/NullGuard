@@ -9,6 +9,9 @@ namespace NullShield.Core.Attributes
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class | AttributeTargets.Property, Inherited = false, AllowMultiple = false)]
     public sealed class NullShieldAttribute : Attribute
     {
+        /// <summary>
+        /// Gets the mitigation strategy used when a null value is detected.
+        /// </summary>
         public MitigationStrategy Strategy { get; }
 
         /// <summary>
