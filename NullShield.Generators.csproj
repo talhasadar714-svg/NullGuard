@@ -9,6 +9,7 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeExplicitFrameworkReference>false</IncludeExplicitFrameworkReference>
     <Deterministic>true</Deterministic>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 
     <PackageId>NullShield.Generators</PackageId>
     <Version>0.0.2</Version>
@@ -22,7 +23,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\\NullShield.Core\\NullShield.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <Compile Include="NullShieldGenerator.cs" />
+    <Compile Include="NullShieldTarget.cs" />
+    <Compile Include="Attributes\**\*.cs" />
+    <Compile Include="Enums\**\*.cs" />
+    <Compile Include="Diagnostics\**\*.cs" />
+    <Compile Include="Polyfills\**\*.cs" />
   </ItemGroup>
 
 </Project>

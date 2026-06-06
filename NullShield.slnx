@@ -1,7 +1,4 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/NullShield.Core/NullShield.Core.csproj" />
-    <Project Path="src/NullShield.Generators/NullShield.Generators.csproj" />
-    <Project Path="src/NullShield.Sample/NullShield.Sample.csproj" />
-  </Folder>
+  <Project Path="NullShield.Generators.csproj" />
+  <Project Path="NullShield.Sample.csproj" />
 </Solution>
