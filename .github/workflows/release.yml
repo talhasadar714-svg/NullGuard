@@ -1,0 +1,35 @@
+name: Publish NullShield to NuGet
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore NullShield.slnx
+
+    - name: Build Project
+      run: dotnet build NullShield.slnx --configuration Release --no-restore
+
+    - name: Pack NuGet Package
+      run: dotnet pack NullShield.slnx --configuration Release --output ./nupkg
+
+    - name: Publish to NuGet.org
+      run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json
