@@ -8,10 +8,6 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
     - name: Checkout Source Code
@@ -20,16 +16,16 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '9.0.x'
 
     - name: Restore Dependencies
-      run: dotnet restore NullShield.slnx
+      run: dotnet restore src/NullShield.Generators/NullShield.Generators.csproj
 
     - name: Build Project
-      run: dotnet build NullShield.slnx --configuration Release --no-restore
+      run: dotnet build src/NullShield.Generators/NullShield.Generators.csproj --configuration Release --no-restore
 
     - name: Pack NuGet Package
-      run: dotnet pack NullShield.slnx --configuration Release --output ./nupkg
+      run: dotnet pack src/NullShield.Generators/NullShield.Generators.csproj --configuration Release --output ./nupkg
 
     - name: Publish to NuGet.org
-      run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json
+      run: dotnet nuget push "./nupkg/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
