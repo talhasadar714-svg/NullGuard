@@ -61,6 +61,12 @@ public sealed class NullShieldGenerator : IIncrementalGenerator
         "NullShield.Core.Attributes.NullShieldAttribute";
 
     /// <summary>
+    /// Fully-qualified metadata name of <c>NotNullAttribute</c>.
+    /// </summary>
+    private const string NotNullAttributeFullName =
+        "NullShield.Core.Attributes.NotNullAttribute";
+
+    /// <summary>
     /// Fully-qualified metadata name of <c>MitigationStrategy</c>.
     /// Used during semantic extraction to resolve the enum constant values.
     /// </summary>
@@ -75,19 +81,58 @@ public sealed class NullShieldGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // -----------------------------------------------------------------
+        // Stage 0: Global configuration (MSBuild properties)
+        // Reads NullGuard_ExceptionType and NullGuard_MessageTemplate from
+        // the consumer's .csproj / Directory.Build.props via Roslyn's
+        // AnalyzerConfigOptionsProvider.  The resulting record is cached by
+        // value equality — if the user hasn't changed their config, all
+        // downstream stages are skipped.
+        // -----------------------------------------------------------------
+        IncrementalValueProvider<NullShieldGlobalOptions> globalOptionsProvider =
+            context.AnalyzerConfigOptionsProvider.Select(static (provider, _) =>
+            {
+                provider.GlobalOptions.TryGetValue(
+                    "build_property.NullGuard_ExceptionType", out string? exceptionType);
+                provider.GlobalOptions.TryGetValue(
+                    "build_property.NullGuard_MessageTemplate", out string? messageTemplate);
+
+                return new NullShieldGlobalOptions(
+                    ExceptionType: string.IsNullOrWhiteSpace(exceptionType)
+                        ? "ArgumentNullException"
+                        : exceptionType!.Trim(),
+                    MessageTemplate: string.IsNullOrWhiteSpace(messageTemplate)
+                        ? null
+                        : messageTemplate!.Trim());
+            });
+
+        // -----------------------------------------------------------------
         // Stage 1: Syntax filter
         // ForAttributeWithMetadataName is the recommended incremental API.
         // It performs a fast, pre-computed index lookup keyed on the attribute's
         // simple name ("NullShieldAttribute") and then validates the full
         // metadata name, keeping the hot path allocation-free.
         // -----------------------------------------------------------------
-        IncrementalValuesProvider<NullShieldTarget?> targetProvider =
+        IncrementalValuesProvider<NullShieldTarget?> methodTargetProvider =
             context.SyntaxProvider
                    .ForAttributeWithMetadataName(
                        fullyQualifiedMetadataName: NullShieldAttributeFullName,
                        predicate: static (node, _) => IsSupportedSyntaxNode(node),
                        transform: static (ctx, ct) => ExtractTarget(ctx, ct))
                    .Where(static target => target is not null);
+
+        IncrementalValuesProvider<NullShieldTarget?> parameterTargetProvider =
+            context.SyntaxProvider
+                   .ForAttributeWithMetadataName(
+                       fullyQualifiedMetadataName: NotNullAttributeFullName,
+                       predicate: static (node, _) => IsSupportedParameterNode(node),
+                       transform: static (ctx, ct) => ExtractParameterTarget(ctx, ct))
+                   .Where(static target => target is not null);
+
+        IncrementalValuesProvider<NullShieldTarget> allTargetsProvider =
+            methodTargetProvider
+                .Collect()
+                .Combine(parameterTargetProvider.Collect())
+                .SelectMany(static (pair, _) => pair.Left.Concat(pair.Right).Where(static t => t is not null).Select(static t => t!).Distinct());
 
         // -----------------------------------------------------------------
         // Stage 2: Collect diagnostics separately so they can be reported
@@ -102,16 +147,54 @@ public sealed class NullShieldGenerator : IIncrementalGenerator
                        transform: static (ctx, ct) => ExtractDiagnostics(ctx, ct))
                    .SelectMany(static (diags, _) => diags);
 
+        IncrementalValuesProvider<Diagnostic> parameterDiagnosticsProvider =
+            context.SyntaxProvider
+                   .ForAttributeWithMetadataName(
+                       fullyQualifiedMetadataName: NotNullAttributeFullName,
+                       predicate: static (node, _) => IsSupportedParameterNode(node),
+                       transform: static (ctx, ct) => ExtractParameterDiagnostics(ctx, ct))
+                   .SelectMany(static (diags, _) => diags);
+
         context.RegisterSourceOutput(diagnosticsProvider,
+            static (spc, diagnostic) => spc.ReportDiagnostic(diagnostic));
+
+        context.RegisterSourceOutput(parameterDiagnosticsProvider,
             static (spc, diagnostic) => spc.ReportDiagnostic(diagnostic));
 
         // -----------------------------------------------------------------
         // Stage 3: Source output
-        // Phase 2 emits a lightweight placeholder per target.
-        // The full SourceEmitter (Phase 3) will replace this stub.
+        // Combines per-target data with global options, then emits a guard
+        // class for each decorated method.  The Combine ensures global
+        // options changes also trigger re-emission.
         // -----------------------------------------------------------------
-        context.RegisterSourceOutput(targetProvider,
-            static (spc, target) => EmitPlaceholder(spc, target!));
+        IncrementalValuesProvider<(NullShieldTarget Target, NullShieldGlobalOptions Options)> combined =
+            allTargetsProvider
+                .Combine(globalOptionsProvider)
+                .Select(static (pair, _) => (Target: pair.Left, Options: pair.Right));
+
+        context.RegisterSourceOutput(combined,
+            static (spc, data) => EmitGuardClass(spc, data.Target, data.Options));
+
+        // -----------------------------------------------------------------
+        // Stage 4: Compilation Metrics
+        // -----------------------------------------------------------------
+        IncrementalValueProvider<ImmutableArray<NullShieldTarget>> collectedTargets = allTargetsProvider.Collect();
+
+        context.RegisterSourceOutput(collectedTargets, static (spc, targets) =>
+        {
+            if (targets.IsDefaultOrEmpty) return;
+
+            int methodsCount = targets.Length;
+            int guardsCount = targets.Sum(static t => t.Parameters.Length);
+
+            var diagnostic = Diagnostic.Create(
+                DiagnosticDescriptors.NullShieldCompilationSummary,
+                Location.None,
+                guardsCount,
+                methodsCount);
+
+            spc.ReportDiagnostic(diagnostic);
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -129,6 +212,14 @@ public sealed class NullShieldGenerator : IIncrementalGenerator
     /// </remarks>
     private static bool IsSupportedSyntaxNode(SyntaxNode node) =>
         node is ClassDeclarationSyntax or MethodDeclarationSyntax;
+
+    /// <summary>
+    /// Returns <see langword="true"/> for ParameterSyntax whose parent's parent is
+    /// a ClassDeclarationSyntax, StructDeclarationSyntax, or RecordDeclarationSyntax,
+    /// indicating a primary constructor parameter.
+    /// </summary>
+    private static bool IsSupportedParameterNode(SyntaxNode node) =>
+        node is ParameterSyntax { Parent.Parent: ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax };
 
     // -------------------------------------------------------------------------
     // Semantic transform (Stage 2)
@@ -212,6 +303,69 @@ public sealed class NullShieldGenerator : IIncrementalGenerator
             LoggerTypeFullName: loggerType?.ToDisplayString(
                 SymbolDisplayFormat.FullyQualifiedFormat),
             ForceGuard: forceGuard,
+            IsPrimaryConstructor: false,
+            Parameters: parameters.ToImmutable());
+    }
+
+    /// <summary>
+    /// Extracts a <see cref="NullShieldTarget"/> for a primary constructor from a parameter decorated with [NotNull].
+    /// </summary>
+    private static NullShieldTarget? ExtractParameterTarget(
+        GeneratorAttributeSyntaxContext context,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (context.TargetSymbol is not IParameterSymbol parameterSymbol)
+            return null;
+
+        if (parameterSymbol.ContainingSymbol is not IMethodSymbol constructorMethod || constructorMethod.MethodKind != MethodKind.Constructor)
+            return null;
+
+        INamedTypeSymbol targetSymbol = constructorMethod.ContainingType;
+
+        bool isClass = targetSymbol.TypeKind == TypeKind.Class;
+        int strategyValue = 0; // Default MitigationStrategy.ThrowException
+        bool forceGuard = false;
+        string? loggerTypeFullName = null;
+
+        foreach (var attr in targetSymbol.GetAttributes())
+        {
+            if (attr.AttributeClass?.ToDisplayString() == NullShieldAttributeFullName)
+            {
+                if (attr.ConstructorArguments.Length > 0 && attr.ConstructorArguments[0].Value is int sv)
+                    strategyValue = sv;
+
+                foreach (KeyValuePair<string, TypedConstant> namedArg in attr.NamedArguments)
+                {
+                    if (namedArg.Key == "LoggerType" && namedArg.Value.Value is ITypeSymbol ts)
+                        loggerTypeFullName = ts.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                    if (namedArg.Key == "ForceGuard" && namedArg.Value.Value is bool forceValue)
+                        forceGuard = forceValue;
+                }
+                break;
+            }
+        }
+
+        var parameters = ImmutableArray.CreateBuilder<(string, string)>();
+        foreach (var p in constructorMethod.Parameters)
+        {
+            if (p.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == NotNullAttributeFullName))
+            {
+                parameters.Add((p.Name, p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+            }
+        }
+
+        return new NullShieldTarget(
+            SymbolName: "PrimaryConstructor",
+            FullyQualifiedName: targetSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ".PrimaryConstructor",
+            ContainingNamespace: targetSymbol.ContainingNamespace?.ToDisplayString() ?? string.Empty,
+            ContainingTypeName: targetSymbol.Name,
+            IsClass: isClass,
+            MitigationStrategyValue: strategyValue,
+            LoggerTypeFullName: loggerTypeFullName,
+            ForceGuard: forceGuard,
+            IsPrimaryConstructor: true,
             Parameters: parameters.ToImmutable());
     }
 
@@ -258,15 +412,46 @@ public sealed class NullShieldGenerator : IIncrementalGenerator
         return builder.ToImmutable();
     }
 
+    /// <summary>
+    /// Produces compile-time diagnostics for primary constructor parameters.
+    /// </summary>
+    private static ImmutableArray<Diagnostic> ExtractParameterDiagnostics(
+        GeneratorAttributeSyntaxContext context,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var builder = ImmutableArray.CreateBuilder<Diagnostic>();
+
+        if (context.TargetSymbol is IParameterSymbol parameterSymbol &&
+            parameterSymbol.ContainingSymbol is IMethodSymbol constructorMethod &&
+            constructorMethod.MethodKind == MethodKind.Constructor)
+        {
+            var targetNode = context.TargetNode.Parent?.Parent;
+            if (targetNode is TypeDeclarationSyntax typeDecl && !typeDecl.Modifiers.Any(SyntaxKind.PartialKeyword))
+            {
+                builder.Add(Diagnostic.Create(
+                    DiagnosticDescriptors.ClassMustBePartial,
+                    context.TargetNode.GetLocation(),
+                    constructorMethod.ContainingType.Name));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
     // -------------------------------------------------------------------------
-    // Source output (Stage 3 — Phase 2 placeholder)
+    // Source output (Stage 3)
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Emits a per-target placeholder source file.
-    /// The full emitter (<c>SourceEmitter.cs</c>) will replace this in Phase 3.
+    /// Emits a per-target guard class source file, using the global configuration
+    /// to determine the exception type and message format.
     /// </summary>
-    private static void EmitPlaceholder(SourceProductionContext spc, NullShieldTarget target)
+    private static void EmitGuardClass(
+        SourceProductionContext spc,
+        NullShieldTarget target,
+        NullShieldGlobalOptions options)
     {
         string hintName = BuildHintName(target);
         var sb = new StringBuilder();
@@ -279,37 +464,98 @@ public sealed class NullShieldGenerator : IIncrementalGenerator
             sb.AppendLine("{");
         }
 
-        // Make it match the naming in Program.cs: NullShield_Guard_Program_YullaniciKaydet
         string className = $"{target.ContainingTypeName}_{target.SymbolName}";
 
         sb.AppendLine($"    public static class NullShield_Guard_{className}");
         sb.AppendLine("    {");
 
-        if (!target.IsClass)
+        var paramList = string.Join(", ",
+            target.Parameters.Select(p => $"{p.Type} {p.Name}"));
+        sb.AppendLine($"        public static void ValidateParameters({paramList})");
+        sb.AppendLine("        {");
+
+        foreach (var p in target.Parameters)
         {
-            var paramList = string.Join(", ", target.Parameters.Select(p => $"{p.Item2} {p.Item1}"));
-            sb.AppendLine($"        public static void ValidateParameters({paramList})");
-            sb.AppendLine("        {");
-            
-            foreach (var p in target.Parameters)
+            if (target.MitigationStrategyValue == 0) // ThrowException
             {
-                if (target.MitigationStrategyValue == 0) // ThrowException
-                {
-                    sb.AppendLine($"            if ({p.Item1} == null) throw new ArgumentNullException(nameof({p.Item1}));");
-                }
+                EmitThrowStatement(sb, p.Name, options);
             }
-            
-            sb.AppendLine("        }");
         }
 
+        sb.AppendLine("        }");
         sb.AppendLine("    }");
+
+        if (target.IsPrimaryConstructor)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"    public partial class {target.ContainingTypeName}");
+            sb.AppendLine("    {");
+            
+            var paramNames = string.Join(", ", target.Parameters.Select(p => p.Name));
+            sb.AppendLine($"        private readonly int __nullShieldGuard_init = NullShield_Guard_{className}.ValidateParameters({paramNames});");
+            // Add a simple return 0 method to ValidateParameters if IsPrimaryConstructor so it can be assigned to int.
+            
+            sb.AppendLine("    }");
+        }
 
         if (!string.IsNullOrEmpty(target.ContainingNamespace))
         {
             sb.AppendLine("}");
         }
 
+        // Fix ValidateParameters signature to return int for primary constructors
+        if (target.IsPrimaryConstructor)
+        {
+            sb.Replace($"public static void ValidateParameters({paramList})", $"public static int ValidateParameters({paramList})");
+            sb.Replace("        }", "            return 0;\n        }");
+        }
+
         spc.AddSource(hintName, SourceText.From(sb.ToString(), Encoding.UTF8));
+    }
+
+    // -------------------------------------------------------------------------
+    // Emit helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Emits a null-check + throw statement for a single parameter,
+    /// respecting the global exception type and optional message template.
+    /// </summary>
+    /// <param name="sb">The <see cref="StringBuilder"/> accumulating the generated source.</param>
+    /// <param name="paramName">The name of the parameter being guarded.</param>
+    /// <param name="options">The project-wide configuration determining exception type and message format.</param>
+    private static void EmitThrowStatement(
+        StringBuilder sb,
+        string paramName,
+        NullShieldGlobalOptions options)
+    {
+        string exceptionType = options.ExceptionType;
+        string constructorArgs;
+
+        if (options.MessageTemplate is not null)
+        {
+            // Format the template: replace {0} with the parameter name.
+            string message = options.MessageTemplate.Replace("{0}", paramName);
+
+            if (exceptionType == "ArgumentNullException")
+            {
+                // ArgumentNullException(string paramName, string message)
+                constructorArgs = $"nameof({paramName}), \"{message}\"";
+            }
+            else
+            {
+                // Custom exception: assume (string message) constructor.
+                constructorArgs = $"\"{message}\"";
+            }
+        }
+        else
+        {
+            // No message template — use nameof(param) as the sole argument.
+            constructorArgs = $"nameof({paramName})";
+        }
+
+        sb.AppendLine(
+            $"            if ({paramName} == null) throw new {exceptionType}({constructorArgs});");
     }
 
     // -------------------------------------------------------------------------

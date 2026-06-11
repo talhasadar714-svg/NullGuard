@@ -61,4 +61,5 @@ internal sealed record NullShieldTarget(
     int MitigationStrategyValue,
     string? LoggerTypeFullName,
     bool ForceGuard,
+    bool IsPrimaryConstructor,
     System.Collections.Immutable.ImmutableArray<(string Name, string Type)> Parameters);

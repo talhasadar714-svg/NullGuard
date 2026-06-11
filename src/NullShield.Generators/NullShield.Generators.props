@@ -1,0 +1,16 @@
+<!-- 
+  NullShield.Generators.props
+  
+  Automatically imported by MSBuild when the NullShield.Generators NuGet package is
+  referenced.  Declares the CompilerVisibleProperty items so the incremental source
+  generator can read NullGuard_* MSBuild properties via Roslyn's GlobalOptions API.
+  
+  For ProjectReference usage (e.g., the Sample project), consumers must declare these
+  CompilerVisibleProperty items manually in their .csproj.
+-->
+<Project>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="NullGuard_ExceptionType" />
+    <CompilerVisibleProperty Include="NullGuard_MessageTemplate" />
+  </ItemGroup>
+</Project>

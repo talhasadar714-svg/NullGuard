@@ -19,6 +19,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="NullGuard_ExceptionType" />
+    <CompilerVisibleProperty Include="NullGuard_MessageTemplate" />
   </ItemGroup>
 
   <ItemGroup>

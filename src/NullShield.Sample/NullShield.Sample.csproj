@@ -5,6 +5,10 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- NullShield Phase 1: Custom exception and message template -->
+    <NullGuard_ExceptionType>ArgumentNullException</NullGuard_ExceptionType>
+    <NullGuard_MessageTemplate>Parameter {0} cannot be null.</NullGuard_MessageTemplate>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +17,12 @@
     <ProjectReference Include="..\NullShield.Generators\NullShield.Generators.csproj" 
                       OutputItemType="Analyzer" 
                       ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Required for source generator to read MSBuild properties via GlobalOptions -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="NullGuard_ExceptionType" />
+    <CompilerVisibleProperty Include="NullGuard_MessageTemplate" />
   </ItemGroup>
 
 </Project>
