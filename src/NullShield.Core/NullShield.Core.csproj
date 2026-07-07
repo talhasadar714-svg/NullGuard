@@ -25,6 +25,12 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <RepositoryUrl>https://github.com/talhasadar714-svg/NullGuard</RepositoryUrl>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
 
-  </Project>
+  <ItemGroup>
+    <None Include="$(UserProfile)\Downloads\icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
