@@ -5,11 +5,6 @@ on:
     tags:
       - 'v*'
 
-# OIDC (Trusted Publishing) için gerekli olan kritik yetkilendirme bloğu
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
@@ -21,17 +16,22 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '9.0.x' # Sistemindeki .NET 9 SDK'sını hedefler
+        dotnet-version: '9.0.x'
 
     - name: Restore Dependencies
-      run: dotnet restore src/NullShield.Generators/NullShield.Generators.csproj
+      run: |
+        dotnet restore src/NullShield.Core/NullShield.Core.csproj
+        dotnet restore src/NullShield.Generators/NullShield.Generators.csproj
 
-    - name: Build Project
-      run: dotnet build src/NullShield.Generators/NullShield.Generators.csproj --configuration Release --no-restore
+    - name: Build Projects
+      run: |
+        dotnet build src/NullShield.Core/NullShield.Core.csproj --configuration Release --no-restore
+        dotnet build src/NullShield.Generators/NullShield.Generators.csproj --configuration Release --no-restore
 
-    - name: Pack NuGet Package
-      run: dotnet pack src/NullShield.Generators/NullShield.Generators.csproj --configuration Release --output ./nupkg
+    - name: Pack NuGet Packages
+      run: |
+        dotnet pack src/NullShield.Core/NullShield.Core.csproj --configuration Release --output ./nupkg
+        dotnet pack src/NullShield.Generators/NullShield.Generators.csproj --configuration Release --output ./nupkg
 
-    # API Key parametresi kaldırıldı, artık doğrudan Trusted Publishing ile güvenli yükleme yapılacak
     - name: Publish to NuGet.org
-      run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
