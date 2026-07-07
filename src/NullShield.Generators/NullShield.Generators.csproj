@@ -15,7 +15,12 @@
     <Authors>Talha Şadar</Authors>
     <Description>Roslyn Incremental Source Generator for NullShield.</Description>
     <DevelopmentDependency>true</DevelopmentDependency>
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />

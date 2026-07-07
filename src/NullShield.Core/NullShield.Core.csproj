@@ -30,7 +30,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(UserProfile)\Downloads\icon.png" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
